@@ -87,6 +87,7 @@ def plot_precip(n):
                 colorbar=dict(
                     tickmode="array",
                     tickvals=[0, 5, 10, 20, 30, 50, 80, 100],
+                    title=dict(text='[mm/h]')
                 )
             ),
             unselected=dict(
@@ -167,7 +168,7 @@ def plot_precip_24h(selectedData):
                     title='Datetime'),
                 yaxis=dict(
                     showgrid=True,
-                    title='Temperature (degree celsius)'),
+                    title='Hourly Precipitation (mm/h)'),
             )
         }
         return figure
