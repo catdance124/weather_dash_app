@@ -46,7 +46,7 @@ def get_dataframe(recent_data=None, load=False):
     return df, recent_data
 
 def get_recent_data():
-    print('GET_____________RECENT  DATA')
+    print('GET_____________RECENT_____________DATA')
     recent, _ = check_file_time()
     recent = recent.replace(minute=0)
     yesterday = recent - timedelta(days=1)

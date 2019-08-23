@@ -181,7 +181,7 @@ def update(reset):
 @app.callback(Output('loader', 'children'),
             [Input('interval-component', 'n_intervals')])
 def print_time(n):
-    get_dataframe(recent_data=None, load=False)
+    get_dataframe(recent_data=None, load=True)
 
 
 if __name__=='__main__':
