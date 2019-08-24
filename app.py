@@ -45,7 +45,10 @@ app.layout = html.Div(
             interval=300*1000, # in milliseconds
             n_intervals=0
         ),
-        html.Div(id="loader")
+        html.Div(id="loader"),
+        html.Div(['© 2019 ', dcc.Link('kinosi', href='https://github.com/catdance124')],
+            style={'padding':'20px 0px 0px 0px', 'font-size':'9pt'}
+        ),
     ],
     style={'height':'100%', 'margin':'0', 'padding':'0', 'text-align': 'center'}
 )
