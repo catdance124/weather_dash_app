@@ -1,26 +1,39 @@
+# basic
+import flask
 import pandas as pd
-import numpy as np 
-import dash 
-import dash_core_components as dcc
-import dash_html_components as html 
-from dash.dependencies import Input, Output
-import plotly.graph_objs as go
+import dask.dataframe as dd
+import numpy as np
 from datetime import datetime, timedelta
 import os, configparser
-from func import get_dataframe, get_colorscale, get_recent_data, get_csv
+# dash
+import dash
+import dash_core_components as dcc
+import dash_html_components as html
+from dash.dependencies import Input, Output
+import plotly.graph_objs as go
+# original
+from precip_colorscale import get_colorscale
+from get_weather_data import load_new_data
 
+# initial settings ===============================================================
+external_stylesheets = ['http://catdance124.m24.coreserver.jp/dash/weather-app/assets/custom.css']
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)  #dash obj
+server = app.server  #flask obj
+app.config.update({
+    'routes_pathname_prefix': '',
+    'requests_pathname_prefix': ''
+})
+# global var
+recent_data = dd.read_csv('./data/24h_precip.csv').compute()
+latest_data = dd.read_csv('./data/latest_precip.csv').compute()
+# mapbox conf
 config = configparser.ConfigParser()
-config.read('mapbox_access_token.conf')
+config.read('./data/mapbox_access_token.conf')
 mapbox_access_token = config.get('setting', 'token')
-app = dash.Dash(__name__)
+# title
 app.title = 'Precipitation Map'
-server = app.server # for Heroku
 
-# init download
-_ = get_csv()  # get latest data
-recent_data = get_recent_data()  # get recent 24h data
-
-# layout
+# layout ==========================================================================
 app.layout = html.Div(
     children=[
         html.H1(children="Precipitation Map",style={'margin-bottom':'10px'}),
@@ -42,48 +55,46 @@ app.layout = html.Div(
         ),
         dcc.Interval(
             id='interval-component',
-            interval=300*1000, # in milliseconds
+            interval=180*1000, # in milliseconds
             n_intervals=0
         ),
-        html.Div(id="loader"),
         html.Div(['© 2019 ', dcc.Link('kinosi', href='https://github.com/catdance124')],
             style={'padding':'20px 0px 0px 0px', 'font-size':'9pt'}
         ),
+        dcc.Location(id='url', refresh=False),
+        html.Div(id='update')
     ],
     style={'height':'100%', 'margin':'0', 'padding':'0', 'text-align': 'center'}
 )
 
+# callbacks =======================================================================
 @app.callback(Output('update_time', 'children'),
             [Input('interval-component', 'n_intervals')])
 def print_time(n):
-    DIFF_JST_FROM_UTC = 9
-    now = datetime.utcnow() + timedelta(hours=DIFF_JST_FROM_UTC)
-    now = now.strftime('%Y/%m/%d %H:%M:%S')
-    return f'update time at  {now} (UTC+9)'
+    file_update_time = datetime.fromtimestamp(os.stat('./data/latest_precip.csv').st_mtime)
+    file_update_time = file_update_time.strftime('%Y/%m/%d %H:%M:%S')
+    return f'update time at  {file_update_time} (UTC+9)'
 
 @app.callback(Output('data_time', 'children'),
             [Input('interval-component', 'n_intervals')])
 def print_time(n):
-    df, _ = get_dataframe(recent_data=None, load=False)
-    t = datetime.strptime(str(df['Date'][0]), '%Y-%m-%d %H:%M').strftime('%Y/%m/%d %H:%M:%S')
+    t = datetime.strptime(str(latest_data['Date'][0]), '%Y-%m-%d %H:%M').strftime('%Y/%m/%d %H:%M:%S')
     return f'display info at {t} (UTC+9)'
 
 @app.callback(Output('precipitation', 'figure'),
             [Input('interval-component', 'n_intervals')])
 def plot_precip(n):
-    global recent_data
-    df, recent_data = get_dataframe(recent_data, load=False)
     figure = {
         'data':[
             go.Scattermapbox(
-            lat = df['lat'],
-            lon = df['lon'],
+            lat = latest_data['lat'],
+            lon = latest_data['lon'],
             mode = 'markers',
             marker = dict(
                 size=10,
                 opacity=1,
                 showscale=True,
-                color=df['precip'],
+                color=latest_data['precip'],
                 cmin=0,
                 cmax=100,
                 colorscale=get_colorscale(),
@@ -93,11 +104,14 @@ def plot_precip(n):
                     title=dict(text='[mm/h]')
                 )
             ),
-            unselected=dict(
-                marker=dict(opacity=0.3)
+            selected=dict(
+                marker=dict(size=18)
             ),
-            text = df['text'],
-            customdata=df['_id'],
+            unselected=dict(
+                marker=dict(opacity=0.9)
+            ),
+            text = latest_data['text'],
+            customdata=latest_data['_id'],
             )
         ],
         'layout':
@@ -112,8 +126,8 @@ def plot_precip(n):
                     accesstoken = mapbox_access_token,
                     bearing = 0,
                     center = dict(
-                        lat = np.mean(df['lat']),
-                        lon = np.mean(df['lon'])
+                        lat = np.mean(latest_data['lat']),
+                        lon = np.mean(latest_data['lon'])
                     ),
                     pitch = 0,
                     zoom = 3.8
@@ -178,15 +192,18 @@ def plot_precip_24h(selectedData):
 
 @app.callback(Output('precipitation', 'selectedData'),
             [Input('reset_button','n_clicks')])
-def update(reset):
+def reset(n):
     return {'points': [{'customdata': 44132}]}
 
-
-@app.callback(Output('loader', 'children'),
+@app.callback(Output('update', 'children'),
             [Input('interval-component', 'n_intervals')])
-def print_time(n):
-    get_dataframe(recent_data=None, load=True)
+def load_data(n):
+    load_new_data()
+    global latest_data
+    global recent_data
+    recent_data = dd.read_csv('./data/24h_precip.csv').compute()
+    latest_data = dd.read_csv('./data/latest_precip.csv', encoding='utf_8_sig').compute()
 
 
 if __name__=='__main__':
-    app.run_server(debug=False, port=5000)
+    app.run_server(debug=False)
