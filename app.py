@@ -10,6 +10,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
+import dash_daq as daq
 import plotly.graph_objs as go
 import uuid
 import pickle
@@ -18,7 +19,8 @@ from precip_colorscale import get_colorscale
 from get_weather_data import load_new_data
 
 # initial settings ===============================================================
-external_stylesheets = ['http://catdance124.m24.coreserver.jp/dash/weather-app/assets/custom.css']
+external_stylesheets = ['http://catdance124.m24.coreserver.jp/dash/weather-app/assets/custom.css',
+                        'https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)  #dash obj
 server = app.server  #flask obj
 app.config.update({
@@ -53,8 +55,14 @@ def serve_layout():
             ),
             html.Div(
                 [html.Button('select reset',id='reset_button', n_clicks=0,
-                    style={'position':'absolute','right':'20%', 'padding':0})],
-                style={'padding':'0px 0px 30px 0px'}
+                    style={'margin': '0px 10px 0px 0px', 'padding': '0px 10px',
+                        'display': 'inline-block', 'vertical-align':'baseline'}
+                ),
+                html.Div([
+                    html.Div(['multiple mode'], style={'font-size':'9pt'}),
+                    daq.ToggleSwitch(id='force', value=False, size=35)
+                ], style={'display': 'inline-block', 'vertical-align':'baseline'})
+                ], style={'padding':'0px 0px 10px 0px'}
             ),
             html.Div(
                 [dcc.Graph(id ='precipitation_24h')],
@@ -140,7 +148,7 @@ def plot_precip(n):
                     pitch = 0,
                     zoom = 3.8
                 ),
-                height = 400,
+                height = 370,
                 paper_bgcolor='rgb(0,0,0,0)',
                 margin = dict(
                     l = 0, r = 0, t = 30, b = 0,
@@ -153,14 +161,15 @@ def plot_precip(n):
 
 @app.callback(Output('precipitation_24h', 'figure'),
             [Input('precipitation', 'selectedData'),
-            Input('session-id', 'children')])
-def plot_precip_24h(selectedData, session_id):
+            Input('session-id', 'children'),
+            Input('force', 'value')])
+def plot_precip_24h(selectedData, session_id, force):
     if selectedData is None:
         return dash.no_update
     else:
         selectedData = selectedData['points']
         store_data = {}
-        if len(selectedData) > 1 and os.path.exists(f'./sessions/{session_id}.pkl'):
+        if (len(selectedData) > 1 or force) and os.path.exists(f'./sessions/{session_id}.pkl'):
             f = open(f'./sessions/{session_id}.pkl','rb')
             store_data = pickle.load(f)
         for sd in selectedData:
@@ -227,4 +236,4 @@ def load_data(n):
 
 
 if __name__=='__main__':
-    app.run_server(debug=False)
+    app.run_server(debug=True)
