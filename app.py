@@ -4,13 +4,15 @@ import pandas as pd
 import dask.dataframe as dd
 import numpy as np
 from datetime import datetime, timedelta
-import os, configparser
+import os, configparser, glob
 # dash
 import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
 import plotly.graph_objs as go
+import uuid
+import pickle
 # original
 from precip_colorscale import get_colorscale
 from get_weather_data import load_new_data
@@ -23,6 +25,8 @@ app.config.update({
     'routes_pathname_prefix': '',
     'requests_pathname_prefix': ''
 })
+# sessions dir
+os.makedirs('./sessions', exist_ok=True)
 # global var
 recent_data = dd.read_csv('./data/24h_precip.csv').compute()
 latest_data = dd.read_csv('./data/latest_precip.csv').compute()
@@ -34,38 +38,42 @@ mapbox_access_token = config.get('setting', 'token')
 app.title = 'Precipitation Map'
 
 # layout ==========================================================================
-app.layout = html.Div(
-    children=[
-        html.H1(children="Precipitation Map",style={'margin-bottom':'10px'}),
-        html.Div(id="update_time"),
-        html.Div(id="data_time"),
-        html.Br(),
-        html.Div(
-            [dcc.Graph(id ='precipitation', selectedData={'points': [{'customdata': 44132}]})],
-            style={'width':'80%', 'display': 'inline-block'}
-        ),
-        html.Div(
-            [html.Button('select reset',id='reset_button', n_clicks=0,
-                style={'position':'absolute','right':'20%', 'padding':0})],
-            style={'padding':'0px 0px 30px 0px'}
-        ),
-        html.Div(
-            [dcc.Graph(id ='precipitation_24h')],
-            style={'width':'80%', 'display': 'inline-block'}
-        ),
-        dcc.Interval(
-            id='interval-component',
-            interval=180*1000, # in milliseconds
-            n_intervals=0
-        ),
-        html.Div(['© 2019 ', dcc.Link('kinosi', href='https://github.com/catdance124')],
-            style={'padding':'20px 0px 0px 0px', 'font-size':'9pt'}
-        ),
-        dcc.Location(id='url', refresh=False),
-        html.Div(id='update')
-    ],
-    style={'height':'100%', 'margin':'0', 'padding':'0', 'text-align': 'center'}
-)
+def serve_layout():
+    session_id = str(uuid.uuid4())
+    return html.Div(
+        children=[
+            html.Div(session_id, id='session-id', style={'display': 'none'}),
+            html.H1(children="Precipitation Map",style={'margin-bottom':'10px'}),
+            html.Div(id="update_time"),
+            html.Div(id="data_time"),
+            html.Br(),
+            html.Div(
+                [dcc.Graph(id ='precipitation', selectedData={'points': [{'customdata': 44132}]})],
+                style={'width':'80%', 'display': 'inline-block'}
+            ),
+            html.Div(
+                [html.Button('select reset',id='reset_button', n_clicks=0,
+                    style={'position':'absolute','right':'20%', 'padding':0})],
+                style={'padding':'0px 0px 30px 0px'}
+            ),
+            html.Div(
+                [dcc.Graph(id ='precipitation_24h')],
+                style={'width':'80%', 'display': 'inline-block'}
+            ),
+            dcc.Interval(
+                id='interval-component',
+                interval=180*1000, # in milliseconds
+                n_intervals=0
+            ),
+            html.Div(['© 2019 ', dcc.Link('kinosi', href='https://github.com/catdance124')],
+                style={'padding':'20px 0px 0px 0px', 'font-size':'9pt'}
+            ),
+            dcc.Location(id='url', refresh=False),
+            html.Div(id='update')
+        ],
+        style={'height':'100%', 'margin':'0', 'padding':'0', 'text-align': 'center'}
+    )
+app.layout = serve_layout()
 
 # callbacks =======================================================================
 @app.callback(Output('update_time', 'children'),
@@ -144,26 +152,34 @@ def plot_precip(n):
     return figure
 
 @app.callback(Output('precipitation_24h', 'figure'),
-            [Input('precipitation', 'selectedData')])
-def plot_precip_24h(selectedData):
+            [Input('precipitation', 'selectedData'),
+            Input('session-id', 'children')])
+def plot_precip_24h(selectedData, session_id):
     if selectedData is None:
         return dash.no_update
     else:
         selectedData = selectedData['points']
-        data = []
+        store_data = {}
+        if len(selectedData) > 1 and os.path.exists(f'./sessions/{session_id}.pkl'):
+            f = open(f'./sessions/{session_id}.pkl','rb')
+            store_data = pickle.load(f)
         for sd in selectedData:
             _id = sd['customdata']
-            city = recent_data[recent_data['_id'] == _id]
-            city_name = city['name'].unique()[0]
-            data.append(go.Scatter(
-                x=city['Date'],
-                y=city['precip'],
-                mode='lines+markers',
-                name=city_name,
-                showlegend=True
-            ))
+            if _id not in store_data.keys():
+                city = recent_data[recent_data['_id'] == _id]
+                city_name = city['name'].unique()[0]
+                store_data[_id] = go.Scatter(
+                    x=city['Date'],
+                    y=city['precip'],
+                    mode='lines+markers',
+                    name=city_name,
+                    showlegend=True
+                )
+        f = open(f'./sessions/{session_id}.pkl','wb')
+        pickle.dump(store_data,f)
+        f.close
         figure = {
-            'data': data,
+            'data': list(store_data.values()),
             'layout': dict(
                 title=dict(
                     text=f'24 hrs precipitation',
@@ -203,6 +219,11 @@ def load_data(n):
     global recent_data
     recent_data = dd.read_csv('./data/24h_precip.csv').compute()
     latest_data = dd.read_csv('./data/latest_precip.csv', encoding='utf_8_sig').compute()
+    for p in glob.glob("./sessions/*"):
+        filetime = datetime.fromtimestamp(os.stat(p).st_mtime)
+        theta = datetime.now() - timedelta(minutes=5)
+        if filetime < theta:
+            os.remove(p)
 
 
 if __name__=='__main__':
