@@ -28,7 +28,7 @@ app.config.update({
 # sessions dir
 os.makedirs('./sessions', exist_ok=True)
 # global var
-load_new_data()
+load_new_data()    # initial
 recent_data = pd.read_pickle('./data/24h_precip.pkl')
 latest_data = pd.read_pickle('./data/latest_precip.pkl')
 # mapbox conf
@@ -86,7 +86,6 @@ app.layout = serve_layout()
 @app.callback(Output('update', 'children'),
             [Input('interval-component', 'n_intervals')])
 def load_data(n):
-    load_new_data()
     global latest_data
     global recent_data
     recent_data = pd.read_pickle('./data/24h_precip.pkl')
