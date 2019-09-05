@@ -1,10 +1,10 @@
 # basic
-import flask
 import pandas as pd
-import dask.dataframe as dd
 import numpy as np
 from datetime import datetime, timedelta
 import os, configparser, glob
+import uuid
+import pickle
 # dash
 import dash
 import dash_core_components as dcc
@@ -12,8 +12,6 @@ import dash_html_components as html
 from dash.dependencies import Input, Output
 import dash_daq as daq
 import plotly.graph_objs as go
-import uuid
-import pickle
 # original
 from precip_colorscale import get_colorscale
 from get_weather_data import load_new_data
@@ -30,8 +28,9 @@ app.config.update({
 # sessions dir
 os.makedirs('./sessions', exist_ok=True)
 # global var
-recent_data = dd.read_csv('./data/24h_precip.csv').compute()
-latest_data = dd.read_csv('./data/latest_precip.csv').compute()
+load_new_data()
+recent_data = pd.read_pickle('./data/24h_precip.pkl')
+latest_data = pd.read_pickle('./data/latest_precip.pkl')
 # mapbox conf
 config = configparser.ConfigParser()
 config.read('./data/mapbox_access_token.conf')
@@ -70,7 +69,7 @@ def serve_layout():
             ),
             dcc.Interval(
                 id='interval-component',
-                interval=180*1000, # in milliseconds
+                interval=60*1000, # in milliseconds
                 n_intervals=0
             ),
             html.Div(['© 2019 ', dcc.Link('kinosi', href='https://github.com/catdance124')],
@@ -84,21 +83,35 @@ def serve_layout():
 app.layout = serve_layout()
 
 # callbacks =======================================================================
-@app.callback(Output('update_time', 'children'),
+@app.callback(Output('update', 'children'),
             [Input('interval-component', 'n_intervals')])
+def load_data(n):
+    load_new_data()
+    global latest_data
+    global recent_data
+    recent_data = pd.read_pickle('./data/24h_precip.pkl')
+    latest_data = pd.read_pickle('./data/latest_precip.pkl')
+    for p in glob.glob("./sessions/*"):
+        filetime = datetime.fromtimestamp(os.stat(p).st_mtime)
+        theta = datetime.now() - timedelta(minutes=5)
+        if filetime < theta:
+            os.remove(p)
+
+@app.callback(Output('update_time', 'children'),
+            [Input('update', 'children')])
 def print_time(n):
-    file_update_time = datetime.fromtimestamp(os.stat('./data/latest_precip.csv').st_mtime)
+    file_update_time = datetime.fromtimestamp(os.stat('./data/latest_precip.pkl').st_mtime)
     file_update_time = file_update_time.strftime('%Y/%m/%d %H:%M:%S')
     return f'update time at  {file_update_time} (UTC+9)'
 
 @app.callback(Output('data_time', 'children'),
-            [Input('interval-component', 'n_intervals')])
+            [Input('update', 'children')])
 def print_time(n):
     t = datetime.strptime(str(latest_data['Date'][0]), '%Y-%m-%d %H:%M').strftime('%Y/%m/%d %H:%M:%S')
     return f'display info at {t} (UTC+9)'
 
 @app.callback(Output('precipitation', 'figure'),
-            [Input('interval-component', 'n_intervals')])
+            [Input('update', 'children')])
 def plot_precip(n):
     figure = {
         'data':[
@@ -219,20 +232,6 @@ def plot_precip_24h(selectedData, session_id, force):
             [Input('reset_button','n_clicks')])
 def reset(n):
     return {'points': [{'customdata': 44132}]}
-
-@app.callback(Output('update', 'children'),
-            [Input('interval-component', 'n_intervals')])
-def load_data(n):
-    load_new_data()
-    global latest_data
-    global recent_data
-    recent_data = dd.read_csv('./data/24h_precip.csv').compute()
-    latest_data = dd.read_csv('./data/latest_precip.csv', encoding='utf_8_sig').compute()
-    for p in glob.glob("./sessions/*"):
-        filetime = datetime.fromtimestamp(os.stat(p).st_mtime)
-        theta = datetime.now() - timedelta(minutes=5)
-        if filetime < theta:
-            os.remove(p)
 
 
 if __name__=='__main__':

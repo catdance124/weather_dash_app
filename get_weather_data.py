@@ -22,13 +22,13 @@ def get_jma_data(url, data_type='precip', latest=True):
     df = pd.merge(jma, place_list, how='left', on='_id')
     df['text'] = df[['name', data_type]].apply(lambda x: '{}:  {}mm'.format(x[0], x[1]), axis=1)
     if latest:        
-        df.to_csv(f'./data/latest_{data_type}.csv', encoding='utf_8_sig')
+        df.to_pickle(f'./data/latest_{data_type}.pkl')
     else:
         return df
 
 
 def get_24h_data(data_type='precip'):
-    latest_df = pd.read_csv(f'./data/latest_{data_type}.csv', encoding='utf_8_sig', index_col=0)
+    latest_df = pd.read_pickle(f'./data/latest_{data_type}.pkl')
     latest_time = datetime.strptime(str(latest_df['Date'][0]), '%Y-%m-%d %H:%M')
     if 0 <= latest_time.minute < 30:
         latest_time = latest_time.replace(minute=0)
@@ -37,11 +37,12 @@ def get_24h_data(data_type='precip'):
     prev_time = latest_time - timedelta(days=1)
 
     df_24h = None
-    if os.path.exists(f'./data/24h_{data_type}.csv'):    # update prev_time
-        df_24h = pd.read_csv(f'./data/24h_{data_type}.csv', encoding='utf_8_sig', index_col=0)
+    if os.path.exists(f'./data/24h_{data_type}.pkl'):    # update prev_time
+        df_24h = pd.read_pickle(f'./data/24h_{data_type}.pkl')
         df_24h['Date'] = pd.to_datetime(df_24h['Date'])
         df_24h = df_24h[df_24h['Date'] >= prev_time]  # delete old data
-        prev_time = datetime.strptime(str(df_24h['Date'][len(df_24h)-1]), '%Y-%m-%d %H:%M:%S')  # latest date
+        if len(df_24h) != 0:
+            prev_time = datetime.strptime(str(df_24h['Date'][len(df_24h)-1]), '%Y-%m-%d %H:%M:%S')  # latest date
     while prev_time <= latest_time:
         timestamp = prev_time.strftime('%Y%m%d%H%M')
         if data_type == 'precip':
@@ -55,11 +56,17 @@ def get_24h_data(data_type='precip'):
     df_24h['Date'] = pd.to_datetime(df_24h['Date'])
     df_24h.sort_values(by='Date')
     df_24h.reset_index(inplace=True, drop=True)
-    df_24h.to_csv(f'./data/24h_{data_type}.csv', encoding='utf_8_sig')
+    df_24h.to_pickle(f'./data/24h_{data_type}.pkl')
 
 def load_new_data():
-    get_jma_data('https://www.data.jma.go.jp/obd/stats/data/mdrr/pre_rct/alltable/pre1h00_rct.csv', data_type='precip')
-    get_24h_data(data_type='precip')
+    file_update_time = datetime.now() - timedelta(days=3)
+    if os.path.exists(f'./data/latest_precip.pkl'):
+        file_update_time = datetime.fromtimestamp(os.stat('./data/latest_precip.pkl').st_mtime)
+    if file_update_time < datetime.now() - timedelta(minutes=2):
+        print('DOWNLOAD!')
+        get_jma_data('https://www.data.jma.go.jp/obd/stats/data/mdrr/pre_rct/alltable/pre1h00_rct.csv', data_type='precip')
+        get_24h_data(data_type='precip')
+
 
 if __name__ == '__main__':
     load_new_data()
