@@ -55,6 +55,7 @@ def get_24h_data(data_type='precip'):
         prev_time = prev_time + timedelta(minutes=30)
     df_24h['Date'] = pd.to_datetime(df_24h['Date'])
     df_24h.sort_values(by='Date')
+    df_24h = df_24h.drop_duplicates()
     df_24h.reset_index(inplace=True, drop=True)
     df_24h.to_pickle(f'./data/24h_{data_type}.pkl')
 

@@ -69,7 +69,7 @@ def serve_layout():
             ),
             dcc.Interval(
                 id='interval-component',
-                interval=60*1000, # in milliseconds
+                interval=600*1000, # in milliseconds
                 n_intervals=0
             ),
             html.Div(['© 2019 ', dcc.Link('kinosi', href='https://github.com/catdance124')],
