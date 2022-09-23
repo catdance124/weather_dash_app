@@ -64,7 +64,6 @@ def load_new_data():
     if os.path.exists(f'./data/latest_precip.pkl'):
         file_update_time = datetime.fromtimestamp(os.stat('./data/latest_precip.pkl').st_mtime)
     if file_update_time < datetime.now() - timedelta(minutes=2):
-        print('DOWNLOAD!')
         get_jma_data('https://www.data.jma.go.jp/obd/stats/data/mdrr/pre_rct/alltable/pre1h00_rct.csv', data_type='precip')
         get_24h_data(data_type='precip')
 

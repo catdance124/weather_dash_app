@@ -17,7 +17,7 @@ from precip_colorscale import get_colorscale
 from get_weather_data import load_new_data
 
 # initial settings ===============================================================
-external_stylesheets = ['http://catdance124.m24.coreserver.jp/dash/weather-app/assets/custom.css',
+external_stylesheets = ['./assets/custom.css',
                         'https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)  #dash obj
 server = app.server  #flask obj
