@@ -26,14 +26,14 @@ app.config.update({
     'requests_pathname_prefix': ''
 })
 # sessions dir
-os.makedirs('./sessions', exist_ok=True)
+os.makedirs('../sessions', exist_ok=True)
 # global var
 load_new_data()    # initial
-recent_data = pd.read_pickle('./data/24h_precip.pkl')
-latest_data = pd.read_pickle('./data/latest_precip.pkl')
+recent_data = pd.read_pickle('../data/24h_precip.pkl')
+latest_data = pd.read_pickle('../data/latest_precip.pkl')
 # mapbox conf
 config = configparser.ConfigParser()
-config.read('./data/mapbox_access_token.conf')
+config.read('../data/mapbox_access_token.conf')
 mapbox_access_token = config.get('setting', 'token')
 # title
 app.title = 'Precipitation Map'
@@ -88,9 +88,9 @@ app.layout = serve_layout()
 def load_data(n):
     global latest_data
     global recent_data
-    recent_data = pd.read_pickle('./data/24h_precip.pkl')
-    latest_data = pd.read_pickle('./data/latest_precip.pkl')
-    for p in glob.glob("./sessions/*"):
+    recent_data = pd.read_pickle('../data/24h_precip.pkl')
+    latest_data = pd.read_pickle('../data/latest_precip.pkl')
+    for p in glob.glob("../sessions/*"):
         filetime = datetime.fromtimestamp(os.stat(p).st_mtime)
         theta = datetime.now() - timedelta(minutes=5)
         if filetime < theta:
@@ -99,7 +99,7 @@ def load_data(n):
 @app.callback(Output('update_time', 'children'),
             [Input('update', 'children')])
 def print_time(n):
-    file_update_time = datetime.fromtimestamp(os.stat('./data/latest_precip.pkl').st_mtime)
+    file_update_time = datetime.fromtimestamp(os.stat('../data/latest_precip.pkl').st_mtime)
     file_update_time = file_update_time.strftime('%Y/%m/%d %H:%M:%S')
     return f'update time at  {file_update_time} (UTC+9)'
 
@@ -181,8 +181,8 @@ def plot_precip_24h(selectedData, session_id, force):
     else:
         selectedData = selectedData['points']
         store_data = {}
-        if (len(selectedData) > 1 or force) and os.path.exists(f'./sessions/{session_id}.pkl'):
-            f = open(f'./sessions/{session_id}.pkl','rb')
+        if (len(selectedData) > 1 or force) and os.path.exists(f'../sessions/{session_id}.pkl'):
+            f = open(f'../sessions/{session_id}.pkl','rb')
             store_data = pickle.load(f)
         for sd in selectedData:
             _id = sd['customdata']
@@ -196,7 +196,7 @@ def plot_precip_24h(selectedData, session_id, force):
                     name=city_name,
                     showlegend=True
                 )
-        f = open(f'./sessions/{session_id}.pkl','wb')
+        f = open(f'../sessions/{session_id}.pkl','wb')
         pickle.dump(store_data,f)
         f.close
         figure = {
@@ -234,4 +234,4 @@ def reset(n):
 
 
 if __name__=='__main__':
-    app.run_server(debug=False)
+    app.run_server(host='0.0.0.0', debug=False)

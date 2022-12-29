@@ -1,0 +1,11 @@
+version: '3'
+services:
+  app:
+    build:
+      context: .
+    volumes:
+      - ./:/opt/app
+    working_dir: /opt/app/src
+    ports:
+      - 8050:8050
+    command: bash -c "python app.py"
