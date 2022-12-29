@@ -3,6 +3,8 @@ services:
   app:
     build:
       context: .
+    environment:
+      - TZ=Asia/Tokyo
     volumes:
       - ./:/opt/app
     working_dir: /opt/app/src
