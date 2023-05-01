@@ -7,7 +7,7 @@ dash-html-components==1.0.0
 dash-renderer==1.0.0
 dash-table==4.1.0
 dataclasses==0.8
-Flask==2.0.2
+Flask==2.3.2
 Flask-Compress==1.10.1
 importlib-metadata==4.8.1
 itsdangerous==2.0.1
